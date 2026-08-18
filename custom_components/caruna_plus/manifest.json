@@ -1,0 +1,13 @@
+{
+  "domain": "caruna_plus",
+  "name": "Caruna+",
+  "version": "0.2.5",
+  "documentation": "https://github.com/Nornode/ha-caruna-plus",
+  "issue_tracker": "https://github.com/Nornode/ha-caruna-plus/issues",
+  "codeowners": ["@Nornode"],
+  "requirements": ["beautifulsoup4>=4.12"],
+  "iot_class": "cloud_polling",
+  "config_flow": true,
+  "integration_type": "hub",
+  "quality_scale": "silver"
+}

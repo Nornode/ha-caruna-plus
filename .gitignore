@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+
+# HA test env
+.venv/
+venv/
+
+# Local HA config used for manual testing
+config/
+
+# HAR captures + fixtures with real customer data — never commit
+docs/har/
+tests/fixtures/*.local.*
+
+
+# Local shell scripts with hardcoded credentials
+scripts/*.local.sh
+
+.DS_Store
+.idea/
+
+scripts/probe_endpoints.local.sh
+scripts/deploy.local.sh

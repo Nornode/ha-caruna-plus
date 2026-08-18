@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Caruna+ kirjautuminen",
+        "description": "Syötä plus.caruna.fi -tunnuksesi.",
+        "data": {
+          "username": "Käyttäjätunnus / sähköposti",
+          "password": "Salasana"
+        }
+      },
+      "mfa": {
+        "title": "Vahvistuskoodi",
+        "description": "{prompt}",
+        "data": {
+          "code": "Koodi"
+        }
+      },
+      "select_customer": {
+        "title": "Valitse asiakas",
+        "description": "Tilillä on useita asiakasnumeroita.",
+        "data": {
+          "customer": "Asiakasnumero"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Syötä salasana uudelleen",
+        "description": "Salasana vaaditaan tunnukselle {username}",
+        "data": {
+          "password": "Salasana"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Väärä käyttäjätunnus tai salasana",
+      "invalid_mfa": "Vahvistuskoodi hylättiin",
+      "cannot_connect": "Yhteys plus.caruna.fi:hin epäonnistui",
+      "unknown": "Odottamaton virhe"
+    },
+    "abort": {
+      "already_configured": "Tili on jo lisätty",
+      "no_customers": "Tilillä ei ole asiakkuuksia",
+      "reauth_successful": "Kirjautuminen onnistui"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Caruna+ asetukset",
+        "data": {
+          "update_interval_minutes": "Päivitysväli (minuuttia)",
+          "enable_hourly": "Hae tuntikohtainen kulutus (suositellaan)"
+        },
+        "data_description": {
+          "update_interval_minutes": "Caruna julkaisee lukemat 12–36 h viiveellä. Alle 15 min väli vain kuluttaa API-kutsuja.",
+          "enable_hourly": "Tarvitaan Energia-koontinäyttöä varten."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy_today": {"name": "Kulutus tänään"},
+      "energy_yesterday": {"name": "Kulutus eilen"},
+      "energy_month_to_date": {"name": "Kulutus tässä kuussa"},
+      "last_reading_time": {"name": "Viimeisin lukema"},
+      "main_fuse": {"name": "Pääsulake"},
+      "contract_type": {"name": "Sopimustyyppi"},
+      "tariff": {"name": "Tariffi"},
+      "delivery_address": {"name": "Toimitusosoite"},
+      "meter_serial": {"name": "Mittarin sarjanumero"},
+      "energy_price": {"name": "Energian hinta"},
+      "transfer_fee": {"name": "Siirtomaksu"},
+      "electricity_tax": {"name": "Sähkövero"},
+      "basic_fee_monthly": {"name": "Perusmaksu"},
+      "cost_month_to_date": {"name": "Kuun kustannus"},
+      "cost_projected_month": {"name": "Kuun ennuste"},
+      "last_invoice_amount": {"name": "Viimeisin lasku"},
+      "last_invoice_due_date": {"name": "Eräpäivä"},
+      "last_invoice_status": {"name": "Laskun tila"},
+      "next_invoice_estimate": {"name": "Seuraavan laskun arvio"},
+      "year_to_date_spend": {"name": "Vuoden kertymä"}
+    },
+    "binary_sensor": {
+      "invoice_overdue": {"name": "Lasku myöhässä"},
+      "invoice_due_soon": {"name": "Lasku erääntymässä"}
+    }
+  }
+}

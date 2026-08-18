@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Inloggning till Caruna+",
+        "description": "Ange dina plus.caruna.fi-uppgifter.",
+        "data": {
+          "username": "Användarnamn / e-post",
+          "password": "Lösenord"
+        }
+      },
+      "mfa": {
+        "title": "Verifieringskod",
+        "description": "{prompt}",
+        "data": {
+          "code": "Kod"
+        }
+      },
+      "select_customer": {
+        "title": "Välj kund",
+        "description": "Flera kunder hittades på detta konto.",
+        "data": {
+          "customer": "Kundnummer"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ange lösenordet igen",
+        "description": "Lösenord krävs för {username}",
+        "data": {
+          "password": "Lösenord"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Ogiltigt användarnamn eller lösenord",
+      "invalid_mfa": "Verifieringskoden avvisades",
+      "cannot_connect": "Kan inte nå plus.caruna.fi",
+      "unknown": "Oväntat fel"
+    },
+    "abort": {
+      "already_configured": "Konto redan konfigurerat",
+      "no_customers": "Inga kunder hittades på detta konto",
+      "reauth_successful": "Omautentisering lyckades"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Caruna+ inställningar",
+        "data": {
+          "update_interval_minutes": "Uppdateringsintervall (minuter)",
+          "enable_hourly": "Hämta timförbrukning (rekommenderas)"
+        },
+        "data_description": {
+          "update_interval_minutes": "Caruna publicerar avläsningar 12–36 h efter. Under 15 min slösar bara API-anrop.",
+          "enable_hourly": "Krävs för Energidashboarden."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy_today": {"name": "Förbrukning idag"},
+      "energy_yesterday": {"name": "Förbrukning igår"},
+      "energy_month_to_date": {"name": "Förbrukning denna månad"},
+      "last_reading_time": {"name": "Senaste avläsning"},
+      "main_fuse": {"name": "Huvudsäkring"},
+      "contract_type": {"name": "Avtalstyp"},
+      "tariff": {"name": "Tariff"},
+      "delivery_address": {"name": "Leveransadress"},
+      "meter_serial": {"name": "Mätarserienummer"},
+      "energy_price": {"name": "Energipris"},
+      "transfer_fee": {"name": "Överföringsavgift"},
+      "electricity_tax": {"name": "Elskatt"},
+      "basic_fee_monthly": {"name": "Grundavgift"},
+      "cost_month_to_date": {"name": "Kostnad denna månad"},
+      "cost_projected_month": {"name": "Beräknad månadskostnad"},
+      "last_invoice_amount": {"name": "Senaste fakturabelopp"},
+      "last_invoice_due_date": {"name": "Förfallodatum"},
+      "last_invoice_status": {"name": "Fakturastatus"},
+      "next_invoice_estimate": {"name": "Uppskattning nästa faktura"},
+      "year_to_date_spend": {"name": "Kostnad hittills i år"}
+    },
+    "binary_sensor": {
+      "invoice_overdue": {"name": "Faktura förfallen"},
+      "invoice_due_soon": {"name": "Faktura förfaller snart"}
+    }
+  }
+}

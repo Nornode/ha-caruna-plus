@@ -1,0 +1,89 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Caruna+ login",
+        "description": "Enter your plus.caruna.fi credentials.",
+        "data": {
+          "username": "Username / email",
+          "password": "Password"
+        }
+      },
+      "mfa": {
+        "title": "Verification code",
+        "description": "{prompt}",
+        "data": {
+          "code": "Code"
+        }
+      },
+      "select_customer": {
+        "title": "Choose customer",
+        "description": "Multiple customers found on this account.",
+        "data": {
+          "customer": "Customer number"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter password",
+        "description": "Password required for {username}",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid username or password",
+      "invalid_mfa": "Verification code rejected",
+      "cannot_connect": "Cannot reach plus.caruna.fi",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Account already configured",
+      "no_customers": "No customers found on this account",
+      "reauth_successful": "Re-authentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Caruna+ options",
+        "data": {
+          "update_interval_minutes": "Update interval (minutes)",
+          "enable_hourly": "Fetch hourly consumption (recommended)"
+        },
+        "data_description": {
+          "update_interval_minutes": "Caruna publishes readings 12–36 h late. Below 15 min just wastes API calls.",
+          "enable_hourly": "Needed for the Energy dashboard."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy_today": {"name": "Energy today"},
+      "energy_yesterday": {"name": "Energy yesterday"},
+      "energy_month_to_date": {"name": "Energy this month"},
+      "last_reading_time": {"name": "Last reading time"},
+      "main_fuse": {"name": "Main fuse"},
+      "contract_type": {"name": "Contract type"},
+      "tariff": {"name": "Tariff"},
+      "delivery_address": {"name": "Delivery address"},
+      "meter_serial": {"name": "Meter serial"},
+      "energy_price": {"name": "Energy price"},
+      "transfer_fee": {"name": "Transfer fee"},
+      "electricity_tax": {"name": "Electricity tax"},
+      "basic_fee_monthly": {"name": "Basic fee"},
+      "cost_month_to_date": {"name": "Cost this month"},
+      "cost_projected_month": {"name": "Projected cost this month"},
+      "last_invoice_amount": {"name": "Last invoice amount"},
+      "last_invoice_due_date": {"name": "Last invoice due date"},
+      "last_invoice_status": {"name": "Last invoice status"},
+      "next_invoice_estimate": {"name": "Next invoice estimate"},
+      "year_to_date_spend": {"name": "Year to date spend"}
+    },
+    "binary_sensor": {
+      "invoice_overdue": {"name": "Invoice overdue"},
+      "invoice_due_soon": {"name": "Invoice due soon"}
+    }
+  }
+}
