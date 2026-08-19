@@ -90,7 +90,7 @@ async def probe(session: aiohttp.ClientSession, username: str, password: str) ->
     yesterday = today - timedelta(days=1)
 
     # ---- assets ----
-    print(f"\n[1] GET assets")
+    print("\n[1] GET assets")
     status, body = await _get_raw(session, EP_ASSETS.format(customer=customer), token)
     items = body if isinstance(body, list) else (body or {}).get("assets", [])
     path = _dump("assets", body)
@@ -107,7 +107,10 @@ async def probe(session: aiohttp.ClientSession, username: str, password: str) ->
 
     # ---- energy: daily (confirmed working) ----
     energy_url = EP_ENERGY.format(customer=customer, mp=mp)
-    params = {"year": str(yesterday.year), "month": str(yesterday.month), "day": str(yesterday.day), "timespan": "daily"}
+    params = {
+        "year": str(yesterday.year), "month": str(yesterday.month),
+        "day": str(yesterday.day), "timespan": "daily",
+    }
     print(f"\n[2] GET energy daily (yesterday={yesterday})")
     status, body = await _get_raw(session, energy_url, token, params=params)
     rows = _list_rows(body)
@@ -150,7 +153,7 @@ async def probe(session: aiohttp.ClientSession, username: str, password: str) ->
         _show_sample(rows)
 
     # ---- invoices: confirmed params from browser DevTools ----
-    print(f"\n[6] GET invoices (status=open and status=paid)")
+    print("\n[6] GET invoices (status=open and status=paid)")
     all_invoices: list = []
     for inv_status in ("open", "paid"):
         url = BASE_URL + f"/api/customers/{customer}/invoices"
@@ -162,7 +165,7 @@ async def probe(session: aiohttp.ClientSession, username: str, password: str) ->
         # Decode compressed format if present (server returns compressedInvoices columnar structure)
         if isinstance(body, dict) and "compressedInvoices" in body:
             rows = _decompress_invoices(body, inv_status)
-            print(f"  status={inv_status!r}: HTTP {status_code} — {len(rows)} invoice(s) (decoded from compressedInvoices)")
+            print(f"  status={inv_status!r}: HTTP {status_code} — {len(rows)} invoice(s) (decoded from compressedInvoices)")  # noqa: E501
         else:
             rows = _list_rows(body)
             print(f"  status={inv_status!r}: HTTP {status_code} — {len(rows)} invoice(s)")
@@ -171,7 +174,7 @@ async def probe(session: aiohttp.ClientSession, username: str, password: str) ->
             all_invoices.extend(rows)
     print(f"  Total across both calls: {len(all_invoices)} invoice(s)")
     if all_invoices:
-        print(f"  All invoice keys seen: {sorted({k for inv in all_invoices for k in inv.keys()})}")
+        print(f"  All invoice keys seen: {sorted({k for inv in all_invoices for k in inv})}")
 
     # ---- prices: try multiple candidate paths ----
     prices_candidates = [
@@ -181,7 +184,7 @@ async def probe(session: aiohttp.ClientSession, username: str, password: str) ->
         f"/api/customers/{customer}/assets/{mp}/tariff",
         f"/api/customers/{customer}/pricelist",
     ]
-    print(f"\n[7] Probing prices endpoint candidates...")
+    print("\n[7] Probing prices endpoint candidates...")
     for path_candidate in prices_candidates:
         url = BASE_URL + path_candidate
         status, body = await _get_raw(session, url, token)

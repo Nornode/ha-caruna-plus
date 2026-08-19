@@ -32,8 +32,8 @@ import aiohttp  # noqa: E402
 
 from custom_components.caruna_plus.auth import (  # noqa: E402
     CarunaAPIError,
-    CarunaAuthError,
     CarunaAuthenticator,
+    CarunaAuthError,
     CarunaConnectionError,
     CarunaMFARequired,
 )
@@ -150,8 +150,9 @@ async def run() -> int:
         if customers:
             print()
             print("Fetching assets to verify API field names...")
-            from custom_components.caruna_plus.api import CarunaPlusClient  # noqa: PLC0415
             import json  # noqa: PLC0415
+
+            from custom_components.caruna_plus.api import CarunaPlusClient  # noqa: PLC0415
             client = CarunaPlusClient(session, username, password,
                                       token_store=auth.token_store)
             try:
@@ -167,10 +168,10 @@ async def run() -> int:
                 print(f"  {len(items)} asset(s) returned")
                 if items:
                     print(f"  Keys in first asset: {list(items[0].keys())}")
-                    print(f"  First asset (pretty):")
+                    print("  First asset (pretty):")
                     print("  " + json.dumps(items[0], indent=4, ensure_ascii=False)
                           .replace("\n", "\n  "))
-            except Exception as err:  # noqa: BLE001
+            except Exception as err:
                 print(f"  Assets fetch failed: {err}")
 
     print()
