@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
@@ -150,7 +149,7 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         except CarunaConnectionError:
             self._last_error = "cannot_connect"
             return None
-        except Exception:  # noqa: BLE001
+        except Exception:
             _LOGGER.exception("Unexpected error during Caruna+ login")
             self._last_error = "unknown"
             return None

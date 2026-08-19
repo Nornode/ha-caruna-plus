@@ -20,7 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -34,8 +34,6 @@ from .const import (
     EP_TOKEN,
     LOGIN_TIMEOUT_SECONDS,
     TOKEN_REFRESH_MARGIN_SECONDS,
-    WICKET_COMPONENT_PATH,
-    WICKET_FOCUS_ELEMENT,
     WICKET_LOGIN_BUTTON,
     WICKET_PASSWORD_FIELD,
     WICKET_USERNAME_FIELD,
@@ -150,7 +148,7 @@ class CarunaAuthenticator:
                     self._login_impl(mfa_code=mfa_code, mfa_state=mfa_state),
                     timeout=LOGIN_TIMEOUT_SECONDS,
                 )
-            except asyncio.TimeoutError as err:
+            except TimeoutError as err:
                 raise CarunaConnectionError("Login timed out") from err
 
     async def _login_impl(self, *, mfa_code: str | None, mfa_state: dict[str, Any] | None) -> str:
@@ -232,7 +230,7 @@ class CarunaAuthenticator:
                     resp.status,
                     resp.url,
                 )
-                if resp.status == 401 or resp.status == 403:
+                if resp.status in {401, 403}:
                     raise CarunaAuthError("Invalid credentials")
                 if resp.status >= 500:
                     raise CarunaConnectionError(f"Credential submit failed: {resp.status}")
@@ -264,7 +262,7 @@ class CarunaAuthenticator:
                         resp.status,
                         resp.url,
                     )
-                    if resp.status == 401 or resp.status == 403:
+                    if resp.status in {401, 403}:
                         raise CarunaAuthError("Invalid credentials (plain POST)")
                     if resp.status >= 500:
                         raise CarunaConnectionError(f"Plain POST failed: {resp.status}")
@@ -402,7 +400,7 @@ class CarunaAuthenticator:
         try:
             async with self._session.post(EP_TOKEN, data=url_params) as resp:
                 _LOGGER.debug("Step 7 EP_TOKEN status=%s", resp.status)
-                if resp.status == 401 or resp.status == 403:
+                if resp.status in {401, 403}:
                     raise CarunaAuthError("Token exchange rejected")
                 if resp.status >= 500:
                     raise CarunaConnectionError(f"Token exchange failed: {resp.status}")
@@ -420,7 +418,7 @@ class CarunaAuthenticator:
 
         # Prefer server-provided expiry; fall back to 55 minutes.
         expires_in = token_data.get("expiresIn") or token_data.get("expires_in") or 3300
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+        expires_at = datetime.now(UTC) + timedelta(seconds=int(expires_in))
 
         user_info = token_data.get("user") or {}
         customers = list(user_info.get("ownCustomerNumbers") or [])

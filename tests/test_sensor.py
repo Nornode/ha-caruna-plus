@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -10,8 +10,8 @@ from custom_components.caruna_plus.coordinator import CarunaPlusData
 from custom_components.caruna_plus.models import (
     Asset,
     BillingSnapshot,
-    EnergySeries,
     EnergyPoint,
+    EnergySeries,
     Invoice,
     PricePlan,
 )
@@ -42,7 +42,7 @@ MP = "MP-001"
 
 
 def _pt(d: date, kwh: float, **kw) -> EnergyPoint:
-    ts = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    ts = datetime(d.year, d.month, d.day, tzinfo=UTC)
     return EnergyPoint(timestamp=ts, kwh=kwh, **kw)
 
 
@@ -131,8 +131,8 @@ def test_energy_month_to_date_sums_current_month():
 def test_last_reading_time_returns_latest_timestamp():
     today = date.today()
     yesterday = today - timedelta(days=1)
-    ts_today = datetime(today.year, today.month, today.day, tzinfo=timezone.utc)
-    ts_yest = datetime(yesterday.year, yesterday.month, yesterday.day, tzinfo=timezone.utc)
+    ts_today = datetime(today.year, today.month, today.day, tzinfo=UTC)
+    ts_yest = datetime(yesterday.year, yesterday.month, yesterday.day, tzinfo=UTC)
     data = CarunaPlusData()
     data.energy_hourly[MP] = _series([
         EnergyPoint(timestamp=ts_yest, kwh=1.0),

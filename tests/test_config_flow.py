@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.caruna_plus import config_flow
+from custom_components.caruna_plus.api import CarunaConnectionError
+from custom_components.caruna_plus.auth import CarunaAuthError
 from custom_components.caruna_plus.const import (
     CONF_CUSTOMER,
     CONF_ENABLE_HOURLY,
@@ -56,8 +56,6 @@ async def test_user_flow_success_creates_entry(hass: HomeAssistant) -> None:
 
 
 async def test_user_flow_invalid_auth(hass: HomeAssistant) -> None:
-    from custom_components.caruna_plus.auth import CarunaAuthError
-
     async def _boom(self, mfa_code=None):
         raise CarunaAuthError("bad password")
 
@@ -74,8 +72,6 @@ async def test_user_flow_invalid_auth(hass: HomeAssistant) -> None:
 
 
 async def test_user_flow_connection_error(hass: HomeAssistant) -> None:
-    from custom_components.caruna_plus.api import CarunaConnectionError
-
     async def _fail(self, mfa_code=None):
         raise CarunaConnectionError("network down")
 

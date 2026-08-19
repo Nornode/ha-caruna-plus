@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
-from typing import Any, Callable
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -57,8 +58,6 @@ def _energy_today(data: CarunaPlusData, mp: str) -> float | None:
 
 
 def _energy_yesterday(data: CarunaPlusData, mp: str) -> float | None:
-    from datetime import timedelta
-
     series = data.energy_daily.get(mp)
     if series is None:
         return None
@@ -200,7 +199,7 @@ def _last_invoice_amount(data: CarunaPlusData) -> float | None:
 
 def _last_invoice_due(data: CarunaPlusData) -> datetime | None:
     if data.billing and data.billing.last_invoice and data.billing.last_invoice.due_date:
-        return datetime.combine(data.billing.last_invoice.due_date, datetime.min.time(), tzinfo=timezone.utc)
+        return datetime.combine(data.billing.last_invoice.due_date, datetime.min.time(), tzinfo=UTC)
     return None
 
 

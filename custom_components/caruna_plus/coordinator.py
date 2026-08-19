@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
+from homeassistant.components.recorder.models.statistics import StatisticMeanType
 from homeassistant.components.recorder.statistics import (
     async_add_external_statistics,
     get_last_statistics,
 )
-from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
-from homeassistant.components.recorder.models.statistics import StatisticMeanType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfEnergy
 from homeassistant.core import HomeAssistant
@@ -58,7 +57,7 @@ class CarunaPlusData:
         ts = self.last_success.get(key)
         if ts is None:
             return True
-        return (datetime.now(timezone.utc) - ts) > max_age
+        return (datetime.now(UTC) - ts) > max_age
 
 
 class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
@@ -84,8 +83,8 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
         self.customer: str | None = customer
         self._enable_hourly: bool = entry.options.get(CONF_ENABLE_HOURLY, True)
 
-        self._contract_next_fetch: datetime = datetime.min.replace(tzinfo=timezone.utc)
-        self._billing_next_fetch: datetime = datetime.min.replace(tzinfo=timezone.utc)
+        self._contract_next_fetch: datetime = datetime.min.replace(tzinfo=UTC)
+        self._billing_next_fetch: datetime = datetime.min.replace(tzinfo=UTC)
         self._data = CarunaPlusData()
         self._lts_backfilled: set[str] = set()
 
@@ -97,7 +96,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 raise UpdateFailed("No customers available")
             self.customer = customers[0].number
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         errors: list[str] = []
 
         # --- contract slice (daily) ---
@@ -148,7 +147,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
         # LTS backfill / append — non-fatal
         try:
             await self._sync_long_term_statistics()
-        except Exception:  # noqa: BLE001 — LTS failure shouldn't nuke the update
+        except Exception:
             _LOGGER.exception("LTS sync failed")
 
         # Only fail the entire update if the contract (assets) slice also
@@ -217,7 +216,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 last_sum = float(entry.get("sum") or 0.0)
                 start = entry.get("start")
                 if isinstance(start, (int, float)):
-                    last_ts = datetime.fromtimestamp(start, tz=timezone.utc)
+                    last_ts = datetime.fromtimestamp(start, tz=UTC)
                 elif isinstance(start, str):
                     last_ts = datetime.fromisoformat(start)
 

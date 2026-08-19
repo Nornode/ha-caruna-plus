@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Callable
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -37,10 +37,7 @@ def _invoice_due_soon(data: CarunaPlusData) -> bool | None:
         return None
     today = date.today()
     horizon = today + timedelta(days=7)
-    for inv in data.billing.open_invoices:
-        if inv.due_date and today <= inv.due_date <= horizon:
-            return True
-    return False
+    return any(inv.due_date and today <= inv.due_date <= horizon for inv in data.billing.open_invoices)
 
 
 DESCRIPTIONS: tuple[CarunaBillingBinarySensorDescription, ...] = (

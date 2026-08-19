@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import aiohttp
 import pytest
@@ -17,7 +17,7 @@ from custom_components.caruna_plus.models import TokenStore
 def _fresh_store() -> TokenStore:
     return TokenStore(
         access_token="fake-token",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
         customer_numbers=["12345678"],
     )
 
@@ -194,7 +194,7 @@ async def test_get_energy_monthly_omits_day_param(energy_response_json) -> None:
             client = CarunaPlusClient(session, "u", "p", token_store=_fresh_store())
             await client.async_get_energy("12345678", "MP-1", target, "monthly")
 
-    called_urls = [str(url) for _, url in mocked.requests.keys()]
+    called_urls = [str(url) for _, url in mocked.requests]
     assert len(called_urls) == 1
     assert "day=" not in called_urls[0]
     assert "timespan=monthly" in called_urls[0]

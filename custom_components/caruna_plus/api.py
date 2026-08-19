@@ -3,23 +3,23 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 import aiohttp
 
 from .auth import (
     CarunaAPIError,
-    CarunaAuthError,
     CarunaAuthenticator,
+    CarunaAuthError,
     CarunaConnectionError,
     CarunaRateLimitError,
 )
 from .const import (
     EP_ASSETS,
     EP_ENERGY,
-    EP_INVOICES,
     EP_INVOICE,
+    EP_INVOICES,
     EP_PRICES,
     REQUEST_TIMEOUT_SECONDS,
 )
@@ -144,12 +144,12 @@ def _to_datetime(value: Any) -> datetime | None:
     if not value:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
 class CarunaPlusClient:
@@ -355,7 +355,9 @@ class CarunaPlusClient:
             detail = await self.async_get_invoice(customer, inv.invoice_id)
             if not detail or not detail.energy_kwh:
                 continue
-            unit = lambda cost: (cost / detail.energy_kwh) if cost and detail.energy_kwh else None
+            def unit(cost: float | None, _kwh: float = detail.energy_kwh) -> float | None:
+                return (cost / _kwh) if cost and _kwh else None
+
             return PricePlan(
                 energy_price=unit(detail.energy_cost),
                 transfer_fee=unit(detail.transfer_cost),

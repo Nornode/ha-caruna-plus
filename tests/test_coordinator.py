@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.caruna_plus.api import CarunaAuthError, CarunaConnectionError, CarunaPlusClient
+from custom_components.caruna_plus.api import (
+    CarunaAuthError,
+    CarunaConnectionError,
+    CarunaPlusClient,
+)
 from custom_components.caruna_plus.auth import CarunaRateLimitError
 from custom_components.caruna_plus.coordinator import CarunaPlusCoordinator
 
 
-def _make_coordinator(hass: HomeAssistant, entry: MockConfigEntry) -> tuple[CarunaPlusClient, CarunaPlusCoordinator]:
+def _make_coordinator(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> tuple[CarunaPlusClient, CarunaPlusCoordinator]:
     """Build a coordinator with a mock client session — no real HTTP ever made."""
     client = CarunaPlusClient(MagicMock(), "u", "p")
     coord = CarunaPlusCoordinator(hass, entry, client, customer="12345678")
