@@ -1,14 +1,14 @@
 {
   "domain": "caruna_plus",
   "name": "Caruna+",
-  "version": "0.2.8",
-  "documentation": "https://github.com/Nornode/ha-caruna-plus",
-  "issue_tracker": "https://github.com/Nornode/ha-caruna-plus/issues",
-  "codeowners": ["@Nornode"],
-  "requirements": ["beautifulsoup4>=4.12"],
   "after_dependencies": ["recorder"],
-  "iot_class": "cloud_polling",
+  "codeowners": ["@Nornode"],
   "config_flow": true,
+  "documentation": "https://github.com/Nornode/ha-caruna-plus",
   "integration_type": "hub",
-  "quality_scale": "silver"
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Nornode/ha-caruna-plus/issues",
+  "quality_scale": "silver",
+  "requirements": ["beautifulsoup4>=4.12"],
+  "version": "0.2.9"
 }
