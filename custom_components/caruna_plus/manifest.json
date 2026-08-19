@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/Nornode/ha-caruna-plus/issues",
   "quality_scale": "silver",
   "requirements": ["beautifulsoup4>=4.12"],
-  "version": "0.2.9"
+  "version": "0.3.0"
 }
