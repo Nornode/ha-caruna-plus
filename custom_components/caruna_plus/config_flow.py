@@ -48,12 +48,14 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
+        super().__init__()
         self._username: str | None = None
         self._password: str | None = None
         self._client: CarunaPlusClient | None = None
         self._customers: list[str] = []
         self._mfa_prompt: str | None = None
         self._reauth_entry: ConfigEntry | None = None
+        self._last_error: str = "unknown"
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -138,6 +140,7 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         try:
             await self._client.async_login()
+            return await self._finish_login()
         except CarunaMFARequired as err:
             self._mfa_prompt = err.prompt
             return await self.async_step_mfa()
@@ -151,7 +154,6 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.exception("Unexpected error during Caruna+ login")
             self._last_error = "unknown"
             return None
-        return await self._finish_login()
 
     async def _finish_login(self) -> ConfigFlowResult:
         assert self._client is not None
@@ -183,16 +185,11 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
-        return CarunaPlusOptionsFlow(config_entry)
-
-    _last_error: str = "unknown"
+        return CarunaPlusOptionsFlow()
 
 
 class CarunaPlusOptionsFlow(OptionsFlow):
     """Options: update interval, hourly toggle."""
-
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:

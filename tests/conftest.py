@@ -2,7 +2,47 @@
 
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import pytest
+
+# Patch aioresponses for aiohttp 3.11+ compatibility.
+# aiohttp 3.11+ added `stream_writer` as a required kwarg to ClientResponse.
+# aioresponses 0.7.x doesn't pass it, so we swap in a subclass that defaults it.
+try:
+    import aiohttp as _aiohttp
+    import aioresponses.core as _aio_core
+    from unittest.mock import Mock as _Mock
+
+    class _PatchedClientResponse(_aiohttp.ClientResponse):  # type: ignore[misc]
+        def __init__(self, method, url, *, stream_writer=None, **kwargs):  # type: ignore[no-untyped-def]
+            super().__init__(method, url, stream_writer=stream_writer or _Mock(), **kwargs)
+
+    _aio_core.ClientResponse = _PatchedClientResponse  # type: ignore[attr-defined]
+except (ImportError, AttributeError):
+    pass
+
+pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable custom integrations for every test in this package."""
+    yield
+
+
+@pytest.fixture
+def mock_config_entry():
+    """Return a MockConfigEntry pre-populated for caruna_plus tests."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.caruna_plus.const import DOMAIN
+
+    return MockConfigEntry(
+        domain=DOMAIN,
+        data={"username": "u@test.fi", "password": "secret", "customer": "12345678"},
+        unique_id="12345678",
+    )
 
 
 @pytest.fixture

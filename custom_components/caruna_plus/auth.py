@@ -297,6 +297,12 @@ class CarunaAuthenticator:
             # which contains an escaped meta-refresh; fall back to that path.
             fallback = self._extract_meta_refresh(ajax_body, base=submit_url)
             if not fallback:
+                _dump_debug("/tmp/caruna_step4_ajax_body.html", ajax_body)
+                _LOGGER.error(
+                    "Step 4 AJAX body contained no redirect URL (length=%d); "
+                    "dumped to /tmp/caruna_step4_ajax_body.html for inspection",
+                    len(ajax_body),
+                )
                 raise CarunaAuthError("Login rejected — no post-credentials redirect")
             next_url = fallback
         # Wicket sometimes returns relative redirect URLs — make them absolute.

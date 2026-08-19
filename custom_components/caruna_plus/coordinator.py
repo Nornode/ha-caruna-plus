@@ -77,6 +77,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
             _LOGGER,
             name=f"{DOMAIN} ({customer or 'unknown'})",
             update_interval=timedelta(minutes=interval_min),
+            config_entry=entry,
         )
         self.entry = entry
         self.client = client
@@ -112,6 +113,8 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                     self._data.last_success["prices"] = now
                 except (CarunaConnectionError, CarunaAPIError) as price_err:
                     _LOGGER.debug("Price fetch failed (non-fatal): %s", price_err)
+            except CarunaAuthError as err:
+                raise ConfigEntryAuthFailed(str(err)) from err
             except (CarunaConnectionError, CarunaAPIError) as err:
                 errors.append(f"contract: {err}")
                 _LOGGER.warning("Contract fetch failed: %s", err)
@@ -124,6 +127,8 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
             wait = err.retry_after or 60
             _LOGGER.warning("Rate limited on energy; backing off %ss", wait)
             errors.append(f"energy: rate-limited (retry after {wait}s)")
+        except CarunaAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
         except (CarunaConnectionError, CarunaAPIError) as err:
             errors.append(f"energy: {err}")
             _LOGGER.warning("Energy fetch failed: %s", err)
@@ -134,6 +139,8 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 self._data.billing = await self.client.async_get_billing(self.customer)
                 self._data.last_success["billing"] = now
                 self._billing_next_fetch = now + BILLING_FETCH_INTERVAL
+            except CarunaAuthError as err:
+                raise ConfigEntryAuthFailed(str(err)) from err
             except (CarunaConnectionError, CarunaAPIError) as err:
                 errors.append(f"billing: {err}")
                 _LOGGER.warning("Billing fetch failed: %s", err)

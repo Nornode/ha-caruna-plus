@@ -305,6 +305,7 @@ COST_DESCRIPTIONS: tuple[CarunaAssetSensorDescription, ...] = (
         native_unit_of_measurement=f"{CURRENCY_EURO}/{UnitOfEnergy.KILO_WATT_HOUR}",
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=5,
+        entity_registry_enabled_default=False,
         value_fn=_energy_price,
     ),
     CarunaAssetSensorDescription(
@@ -351,6 +352,7 @@ COST_DESCRIPTIONS: tuple[CarunaAssetSensorDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement=CURRENCY_EURO,
         suggested_display_precision=2,
+        entity_registry_enabled_default=False,
         value_fn=_cost_projected_month,
     ),
 )
@@ -384,6 +386,7 @@ BILLING_DESCRIPTIONS: tuple[CarunaCustomerSensorDescription, ...] = (
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement=CURRENCY_EURO,
         suggested_display_precision=2,
+        entity_registry_enabled_default=False,
         value_fn=_next_invoice_estimate,
     ),
     CarunaCustomerSensorDescription(

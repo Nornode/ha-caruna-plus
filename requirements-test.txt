@@ -3,3 +3,4 @@ pytest-asyncio>=0.23
 pytest-cov>=5.0
 pytest-homeassistant-custom-component>=0.13
 aioresponses>=0.7
+beautifulsoup4>=4.12

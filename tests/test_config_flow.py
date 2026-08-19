@@ -1,86 +1,140 @@
-"""Config-flow tests.
-
-Requires pytest-homeassistant-custom-component for hass + MockConfigEntry.
-Marked xfail-strict-off so CI still passes if the test env isn't available;
-real coverage runs locally with the plugin installed.
-"""
+"""Config-flow tests."""
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
-pytest.importorskip("pytest_homeassistant_custom_component")
+from homeassistant import config_entries
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResultType
 
-from homeassistant import config_entries  # noqa: E402
-from homeassistant.core import HomeAssistant  # noqa: E402
-from homeassistant.data_entry_flow import FlowResultType  # noqa: E402
+from custom_components.caruna_plus import config_flow
+from custom_components.caruna_plus.const import (
+    CONF_CUSTOMER,
+    CONF_ENABLE_HOURLY,
+    CONF_UPDATE_INTERVAL,
+    DOMAIN,
+)
+from custom_components.caruna_plus.models import Customer, TokenStore
 
-from custom_components.caruna_plus.const import DOMAIN  # noqa: E402
+
+def _mock_client(customers: list[Customer] | None = None) -> MagicMock:
+    """Build a mock CarunaPlusClient that logs in successfully."""
+    client = MagicMock()
+    client.async_login = AsyncMock()
+    client.async_get_customers = AsyncMock(
+        return_value=customers or [Customer(number="12345678", name="Test User")]
+    )
+    client.token_store = TokenStore(access_token="tok", customer_numbers=["12345678"])
+    return client
 
 
-@pytest.mark.asyncio
 async def test_user_flow_shows_form(hass: HomeAssistant) -> None:
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    assert result["type"] == FlowResultType.FORM
+    assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
 
 
-@pytest.mark.asyncio
-async def test_user_flow_invalid_auth(hass: HomeAssistant, monkeypatch) -> None:
-    from custom_components.caruna_plus import config_flow
+async def test_user_flow_success_creates_entry(hass: HomeAssistant) -> None:
+    """Happy path: valid credentials → CREATE_ENTRY with expected data keys."""
+    with patch.object(config_flow, "CarunaPlusClient", return_value=_mock_client()):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_USERNAME: "u@test.fi", CONF_PASSWORD: "secret"}
+        )
 
-    async def _boom(self):
-        from custom_components.caruna_plus.api import CarunaAuthError
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_CUSTOMER] == "12345678"
+    assert result["data"][CONF_USERNAME] == "u@test.fi"
 
-        raise CarunaAuthError("nope")
 
-    monkeypatch.setattr(config_flow.CarunaPlusClient, "async_login", _boom)
+async def test_user_flow_invalid_auth(hass: HomeAssistant) -> None:
+    from custom_components.caruna_plus.auth import CarunaAuthError
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"username": "u", "password": "p"}
-    )
-    assert result["type"] == FlowResultType.FORM
+    async def _boom(self, mfa_code=None):
+        raise CarunaAuthError("bad password")
+
+    with patch.object(config_flow.CarunaPlusClient, "async_login", _boom):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_USERNAME: "u", CONF_PASSWORD: "wrong"}
+        )
+
+    assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "invalid_auth"}
 
 
-@pytest.mark.asyncio
-async def test_user_flow_connection_error(hass: HomeAssistant, monkeypatch) -> None:
-    """A network error during login surfaces as the 'cannot_connect' error."""
-    from custom_components.caruna_plus import config_flow
+async def test_user_flow_connection_error(hass: HomeAssistant) -> None:
     from custom_components.caruna_plus.api import CarunaConnectionError
 
-    async def _fail_connect(self):
-        raise CarunaConnectionError("down")
+    async def _fail(self, mfa_code=None):
+        raise CarunaConnectionError("network down")
 
-    monkeypatch.setattr(config_flow.CarunaPlusClient, "async_login", _fail_connect)
+    with patch.object(config_flow.CarunaPlusClient, "async_login", _fail):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_USERNAME: "u", CONF_PASSWORD: "p"}
+        )
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"username": "u", "password": "p"}
-    )
-    assert result["type"] == FlowResultType.FORM
+    assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "cannot_connect"}
 
 
-@pytest.mark.asyncio
-async def test_options_flow_shows_form(hass: HomeAssistant) -> None:
-    """Options flow init renders the update-interval/hourly-enable form."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+async def test_user_flow_already_configured(hass: HomeAssistant, mock_config_entry) -> None:
+    """Attempting to set up the same customer number twice → ABORT already_configured."""
+    mock_config_entry.add_to_hass(hass)
 
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        data={"username": "u", "password": "p", "customer": "12345678"},
-        unique_id="12345678",
-    )
-    entry.add_to_hass(hass)
+    with patch.object(config_flow, "CarunaPlusClient", return_value=_mock_client()):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_USERNAME: "u@test.fi", CONF_PASSWORD: "secret"}
+        )
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
-    assert result["type"] == FlowResultType.FORM
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_user_flow_no_customers_aborts(hass: HomeAssistant) -> None:
+    """Login succeeds but account has no customer numbers → ABORT."""
+    with patch.object(config_flow, "CarunaPlusClient", return_value=_mock_client(customers=[])):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_USERNAME: "u@test.fi", CONF_PASSWORD: "secret"}
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "no_customers"
+
+
+async def test_options_flow_shows_form(hass: HomeAssistant, mock_config_entry) -> None:
+    mock_config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "init"
+
+
+async def test_options_flow_saves_options(hass: HomeAssistant, mock_config_entry) -> None:
+    mock_config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {CONF_UPDATE_INTERVAL: 30, CONF_ENABLE_HOURLY: False},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert mock_config_entry.options[CONF_UPDATE_INTERVAL] == 30
+    assert mock_config_entry.options[CONF_ENABLE_HOURLY] is False

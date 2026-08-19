@@ -40,7 +40,8 @@
     "abort": {
       "already_configured": "Account already configured",
       "no_customers": "No customers found on this account",
-      "reauth_successful": "Re-authentication successful"
+      "reauth_successful": "Re-authentication successful",
+      "unknown": "An unexpected error occurred during setup"
     }
   },
   "options": {

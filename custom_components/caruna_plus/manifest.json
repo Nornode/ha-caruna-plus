@@ -1,7 +1,7 @@
 {
   "domain": "caruna_plus",
   "name": "Caruna+",
-  "version": "0.2.5",
+  "version": "0.2.7",
   "documentation": "https://github.com/Nornode/ha-caruna-plus",
   "issue_tracker": "https://github.com/Nornode/ha-caruna-plus/issues",
   "codeowners": ["@Nornode"],
