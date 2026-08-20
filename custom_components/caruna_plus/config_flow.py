@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import FlowError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import (
@@ -149,6 +150,8 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         except CarunaConnectionError:
             self._last_error = "cannot_connect"
             return None
+        except FlowError:
+            raise
         except Exception:
             _LOGGER.exception("Unexpected error during Caruna+ login")
             self._last_error = "unknown"

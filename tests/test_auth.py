@@ -51,7 +51,12 @@ async def test_full_login_happy_path(
         mocked.post(
             "https://plus.caruna.fi/api/authorization/callback",
             status=302,
-            headers={"Location": "https://plus.caruna.fi/?code=XYZ&state=abc"},
+            headers={"Location": "https://authentication2.caruna.fi/oauth2/authorize?sessionDataKey=test123"},
+        )
+        mocked.get(
+            re.compile(r"https://authentication2\.caruna\.fi/oauth2/authorize\?sessionDataKey=test123"),
+            status=302,
+            headers={"Location": "https://plus.caruna.fi/openid-login-return?code=XYZ&state=abc&session_state=xyz"},
         )
         mocked.post(EP_TOKEN, payload=token_response_json)
 
@@ -135,7 +140,12 @@ async def test_concurrent_logins_share_lock(
         mocked.post(
             "https://plus.caruna.fi/api/authorization/callback",
             status=302,
-            headers={"Location": "https://plus.caruna.fi/?code=XYZ&state=abc"},
+            headers={"Location": "https://authentication2.caruna.fi/oauth2/authorize?sessionDataKey=test123"},
+        )
+        mocked.get(
+            re.compile(r"https://authentication2\.caruna\.fi/oauth2/authorize\?sessionDataKey=test123"),
+            status=302,
+            headers={"Location": "https://plus.caruna.fi/openid-login-return?code=XYZ&state=abc&session_state=xyz"},
         )
         mocked.post(EP_TOKEN, payload=token_response_json)
 
@@ -177,7 +187,12 @@ async def test_expired_token_triggers_full_relogin(
         mocked.post(
             "https://plus.caruna.fi/api/authorization/callback",
             status=302,
-            headers={"Location": "https://plus.caruna.fi/?code=XYZ&state=abc"},
+            headers={"Location": "https://authentication2.caruna.fi/oauth2/authorize?sessionDataKey=test123"},
+        )
+        mocked.get(
+            re.compile(r"https://authentication2\.caruna\.fi/oauth2/authorize\?sessionDataKey=test123"),
+            status=302,
+            headers={"Location": "https://plus.caruna.fi/openid-login-return?code=XYZ&state=abc&session_state=xyz"},
         )
         mocked.post(EP_TOKEN, payload=token_response_json)
 

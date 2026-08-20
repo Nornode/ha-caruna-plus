@@ -68,13 +68,11 @@ async def test_get_billing_derives_open_and_ytd(
 ) -> None:
     with aioresponses() as mocked:
         mocked.get(
-            EP_INVOICES.format(customer="12345678"),
-            params={"status": "open"},
+            EP_INVOICES.format(customer="12345678") + "?status=open",
             payload=invoices_open_response,
         )
         mocked.get(
-            EP_INVOICES.format(customer="12345678"),
-            params={"status": "paid"},
+            EP_INVOICES.format(customer="12345678") + "?status=paid",
             payload=invoices_paid_response,
         )
 
@@ -207,13 +205,11 @@ async def test_get_invoices_fetches_open_and_paid_separately(
     """async_get_invoices makes two requests: one for open, one for paid."""
     with aioresponses() as mocked:
         mocked.get(
-            EP_INVOICES.format(customer="12345678"),
-            params={"status": "open"},
+            EP_INVOICES.format(customer="12345678") + "?status=open",
             payload=invoices_open_response,
         )
         mocked.get(
-            EP_INVOICES.format(customer="12345678"),
-            params={"status": "paid"},
+            EP_INVOICES.format(customer="12345678") + "?status=paid",
             payload=invoices_paid_response,
         )
 
@@ -292,3 +288,24 @@ async def test_401_triggers_single_retry_then_gives_up(assets_response_json) -> 
             client.auth.async_login = _no_relogin  # type: ignore[assignment]
             with pytest.raises(CarunaAuthError):
                 await client.async_get_assets("12345678")
+
+
+@pytest.mark.asyncio
+async def test_403_triggers_token_relogin_and_retry(assets_response_json) -> None:
+    """A forbidden bearer token is treated as expired and retried after re-login."""
+    with aioresponses() as mocked:
+        mocked.get(EP_ASSETS.format(customer="12345678"), status=403)
+        mocked.get(EP_ASSETS.format(customer="12345678"), payload=assets_response_json)
+
+        async with aiohttp.ClientSession() as session:
+            client = CarunaPlusClient(session, "u", "p", token_store=_fresh_store())
+
+            async def _relogin(*args, **kwargs):
+                client.token_store.access_token = "fresh-token"
+                client.token_store.expires_at = datetime.now(UTC) + timedelta(hours=1)
+                return "fresh-token"
+
+            client.auth.async_login = _relogin  # type: ignore[assignment]
+            assets = await client.async_get_assets("12345678")
+
+    assert len(assets) == 1

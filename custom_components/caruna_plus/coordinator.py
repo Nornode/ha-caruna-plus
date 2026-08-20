@@ -199,6 +199,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 source=LTS_SOURCE,
                 statistic_id=statistic_id,
                 unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+                unit_class="energy",
             )
 
             if mp_id not in self._lts_backfilled:

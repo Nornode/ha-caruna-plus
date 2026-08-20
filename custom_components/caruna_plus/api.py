@@ -436,11 +436,11 @@ class CarunaPlusClient:
         timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
         try:
             async with self._session.get(url, params=params, headers=headers, timeout=timeout) as resp:
-                if resp.status == 401 and _retry:
+                if resp.status in {401, 403} and _retry:
                     await self._auth.async_invalidate_token()
                     return await self._get_json(url, params=params, allow_missing=allow_missing, _retry=False)
-                if resp.status == 401:
-                    raise CarunaAuthError(f"401 after retry on {url}")
+                if resp.status in {401, 403}:
+                    raise CarunaAuthError(f"{resp.status} after retry on {url}")
                 if resp.status == 404 and allow_missing:
                     return None
                 if resp.status == 429:

@@ -26,7 +26,7 @@ def _mock_client(customers: list[Customer] | None = None) -> MagicMock:
     client = MagicMock()
     client.async_login = AsyncMock()
     client.async_get_customers = AsyncMock(
-        return_value=customers or [Customer(number="12345678", name="Test User")]
+        return_value=customers if customers is not None else [Customer(number="12345678", name="Test User")]
     )
     client.token_store = TokenStore(access_token="tok", customer_numbers=["12345678"])
     return client

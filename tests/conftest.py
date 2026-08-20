@@ -4,23 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-# Patch aioresponses for aiohttp 3.11+ compatibility.
-# aiohttp 3.11+ added `stream_writer` as a required kwarg to ClientResponse.
-# aioresponses 0.7.x doesn't pass it, so we swap in a subclass that defaults it.
-try:
-    from unittest.mock import Mock as _Mock
-
-    import aiohttp as _aiohttp
-    import aioresponses.core as _aio_core
-
-    class _PatchedClientResponse(_aiohttp.ClientResponse):  # type: ignore[misc]
-        def __init__(self, method, url, *, stream_writer=None, **kwargs):  # type: ignore[no-untyped-def]
-            super().__init__(method, url, stream_writer=stream_writer or _Mock(), **kwargs)
-
-    _aio_core.ClientResponse = _PatchedClientResponse  # type: ignore[attr-defined]
-except (ImportError, AttributeError):
-    pass
-
 pytest_plugins = "pytest_homeassistant_custom_component"
 
 
