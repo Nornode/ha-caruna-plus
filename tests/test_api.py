@@ -291,6 +291,26 @@ async def test_401_triggers_single_retry_then_gives_up(assets_response_json) -> 
 
 
 @pytest.mark.asyncio
+async def test_http_200_login_page_triggers_relogin(assets_response_json) -> None:
+    """A server-side session expiry can return the login form with HTTP 200."""
+    from custom_components.caruna_plus.api import CarunaAuthError
+
+    login_page = '<html><form><input type="password" name="userPassword"></form></html>'
+    with aioresponses() as mocked:
+        mocked.get(EP_ASSETS.format(customer="12345678"), body=login_page)
+
+        async with aiohttp.ClientSession() as session:
+            client = CarunaPlusClient(session, "u", "p", token_store=_fresh_store())
+
+            async def _no_relogin(*args, **kwargs):
+                raise CarunaAuthError("relogin blocked in test")
+
+            client.auth.async_login = _no_relogin  # type: ignore[assignment]
+            with pytest.raises(CarunaAuthError):
+                await client.async_get_assets("12345678")
+
+
+@pytest.mark.asyncio
 async def test_403_triggers_token_relogin_and_retry(assets_response_json) -> None:
     """A forbidden bearer token is treated as expired and retried after re-login."""
     with aioresponses() as mocked:

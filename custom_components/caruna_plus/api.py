@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import UTC, date, datetime
 from typing import Any
@@ -36,6 +37,12 @@ from .models import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _is_login_page(body: str) -> bool:
+    """Detect an HTML login page returned instead of an API response."""
+    lowered = body.lower()
+    return "<form" in lowered and ('type="password"' in lowered or "type='password'" in lowered)
 
 
 def _to_float(value: Any) -> float | None:
@@ -456,7 +463,15 @@ class CarunaPlusClient:
                     if allow_missing:
                         return None
                     raise CarunaAPIError(f"GET {url} → {resp.status}")
-                return await resp.json(content_type=None)
+                body = await resp.text()
+                if _is_login_page(body):
+                    if _retry:
+                        await self._auth.async_invalidate_token()
+                        return await self._get_json(
+                            url, params=params, allow_missing=allow_missing, _retry=False
+                        )
+                    raise CarunaAuthError(f"Login page returned after retry on {url}")
+                return json.loads(body)
         except aiohttp.ClientError as err:
             raise CarunaConnectionError(f"GET {url} network error: {err}") from err
 
