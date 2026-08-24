@@ -63,6 +63,7 @@
       "energy_today": {"name": "Kulutus tänään"},
       "energy_yesterday": {"name": "Kulutus eilen"},
       "energy_month_to_date": {"name": "Kulutus tässä kuussa"},
+      "energy_month_to_date_previous_year": {"name": "Kulutus tässä kuussa viime vuonna"},
       "last_reading_time": {"name": "Viimeisin lukema"},
       "main_fuse": {"name": "Pääsulake"},
       "contract_type": {"name": "Sopimustyyppi"},

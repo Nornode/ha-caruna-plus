@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from calendar import monthrange
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -73,6 +74,22 @@ def _energy_month_to_date(data: CarunaPlusData, mp: str) -> float | None:
         return None
     today = date.today()
     total = sum(p.kwh for p in series.points if p.timestamp.date().replace(day=1) == today.replace(day=1))
+    return round(total, 3) or None
+
+
+def _energy_month_to_date_previous_year(data: CarunaPlusData, mp: str) -> float | None:
+    series = data.energy_daily_previous_year.get(mp)
+    if series is None:
+        return None
+    today = date.today()
+    target_year = today.year - 1
+    target_day = min(today.day, monthrange(target_year, today.month)[1])
+    total = sum(
+        p.kwh for p in series.points
+        if p.timestamp.date().year == target_year
+        and p.timestamp.date().month == today.month
+        and p.timestamp.date().day <= target_day
+    )
     return round(total, 3) or None
 
 
@@ -152,7 +169,16 @@ def _basic_fee(data: CarunaPlusData, mp: str) -> float | None:
     if plan and plan.basic_fee_monthly is not None:
         return plan.basic_fee_monthly
     asset = _asset(data, mp)
-    return asset.basic_fee_monthly if asset else None
+    if asset and asset.basic_fee_monthly is not None:
+        return asset.basic_fee_monthly
+    series = data.energy_daily.get(mp)
+    if series:
+        daily_fees = [p.distribution_base_fee for p in series.points if p.distribution_base_fee is not None]
+        if daily_fees:
+            latest = max(series.points, key=lambda p: p.timestamp).timestamp.date()
+            days_in_month = monthrange(latest.year, latest.month)[1]
+            return round((sum(daily_fees) / len(daily_fees)) * days_in_month, 2)
+    return None
 
 
 def _cost_month_to_date(data: CarunaPlusData, mp: str) -> float | None:
@@ -246,6 +272,15 @@ CONSUMPTION_DESCRIPTIONS: tuple[CarunaAssetSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         suggested_display_precision=2,
         value_fn=_energy_month_to_date,
+    ),
+    CarunaAssetSensorDescription(
+        key="energy_month_to_date_previous_year",
+        translation_key="energy_month_to_date_previous_year",
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        suggested_display_precision=2,
+        value_fn=_energy_month_to_date_previous_year,
     ),
     CarunaAssetSensorDescription(
         key="last_reading_time",

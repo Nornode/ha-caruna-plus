@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -48,6 +49,7 @@ class CarunaPlusData:
 
     assets: list[Asset] = field(default_factory=list)
     energy_daily: dict[str, EnergySeries] = field(default_factory=dict)
+    energy_daily_previous_year: dict[str, EnergySeries] = field(default_factory=dict)
     energy_hourly: dict[str, EnergySeries] = field(default_factory=dict)
     prices: dict[str, PricePlan] = field(default_factory=dict)
     billing: BillingSnapshot | None = None
@@ -177,6 +179,15 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
             # Used for energy_yesterday and energy_month_to_date sensors.
             monthly = await self.client.async_get_energy(self.customer, mp, today, "monthly")
             self._data.energy_daily[mp] = monthly
+            previous_year = date(
+                today.year - 1,
+                today.month,
+                min(today.day, monthrange(today.year - 1, today.month)[1]),
+            )
+            previous_year_monthly = await self.client.async_get_energy(
+                self.customer, mp, previous_year, "monthly"
+            )
+            self._data.energy_daily_previous_year[mp] = previous_year_monthly
 
     async def _fetch_prices(self) -> None:
         for asset in self._data.assets:

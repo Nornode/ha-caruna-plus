@@ -65,7 +65,23 @@ with open(sys.argv[1], encoding="utf-8") as manifest:
 PY
 )"
 
-DEFAULT_TAG="v$VERSION"
+TODAY_YEAR="$(date +%Y)"
+TODAY_MONTH="$(date +%-m)"
+DEFAULT_VERSION="$(python3 - "$VERSION" "$TODAY_YEAR" "$TODAY_MONTH" <<'PY'
+import re
+import sys
+
+version = sys.argv[1]
+year = sys.argv[2]
+month = sys.argv[3]
+match = re.fullmatch(r"(20\d{2})\.([1-9]|1[0-2])\.(\d+)", version)
+if match and match.group(1) == year and match.group(2) == month:
+    print(f"{year}.{month}.{int(match.group(3)) + 1}")
+else:
+    print(f"{year}.{month}.0")
+PY
+)"
+DEFAULT_TAG="v$DEFAULT_VERSION"
 CURRENT_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
 [ -n "$CURRENT_BRANCH" ] || die "Releases must be made from a branch, not a detached HEAD."
 
@@ -86,7 +102,7 @@ echo
 NEW_TAG="$(prompt_default "New tag" "$DEFAULT_TAG")"
 PREVIOUS_TAG="$(prompt_default "Compare from tag" "${LATEST_TAG:-<root>}")"
 
-[[ "$NEW_TAG" =~ ^v20[0-9]{2}\.(0[1-9]|1[0-2])\.[0-9]{2}([-+][0-9A-Za-z.-]+)?$ ]] || die "Tag must look like v2026.08.01; got $NEW_TAG"
+[[ "$NEW_TAG" =~ ^v20[0-9]{2}\.([1-9]|1[0-2])\.[0-9]+$ ]] || die "Tag must look like v2026.8.0; got $NEW_TAG"
 RELEASE_VERSION="${NEW_TAG#v}"
 
 if [ "$PREVIOUS_TAG" = "<root>" ]; then

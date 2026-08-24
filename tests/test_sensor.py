@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from calendar import monthrange
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -23,6 +24,7 @@ from custom_components.caruna_plus.sensor import (
     _cost_projected_month,
     _electricity_tax,
     _energy_month_to_date,
+    _energy_month_to_date_previous_year,
     _energy_price,
     _energy_today,
     _energy_yesterday,
@@ -128,6 +130,24 @@ def test_energy_month_to_date_sums_current_month():
     assert _energy_month_to_date(data, MP) == pytest.approx(8.0)
 
 
+def test_energy_month_to_date_previous_year_sums_to_same_day():
+    today = date.today()
+    previous_year = date(
+        today.year - 1,
+        today.month,
+        min(today.day, monthrange(today.year - 1, today.month)[1]),
+    )
+    first_day = previous_year.replace(day=1)
+    next_day = previous_year + timedelta(days=1)
+    data = CarunaPlusData()
+    data.energy_daily_previous_year[MP] = _series([
+        _pt(first_day, 3.0),
+        _pt(previous_year, 5.0),
+        _pt(next_day, 20.0),
+    ])
+    assert _energy_month_to_date_previous_year(data, MP) == pytest.approx(8.0)
+
+
 def test_last_reading_time_returns_latest_timestamp():
     today = date.today()
     yesterday = today - timedelta(days=1)
@@ -210,6 +230,18 @@ def test_electricity_tax_derived_from_daily_energy():
 def test_basic_fee_from_asset():
     data = CarunaPlusData(assets=[_asset(basic_fee_monthly=4.5)])
     assert _basic_fee(data, MP) == pytest.approx(4.5)
+
+
+def test_basic_fee_derived_from_daily_base_fee():
+    today = date.today()
+    data = CarunaPlusData()
+    data.energy_daily[MP] = _series([
+        _pt(today.replace(day=1), kwh=1.0, distribution_base_fee=0.20),
+        _pt(today, kwh=1.0, distribution_base_fee=0.20),
+    ])
+    assert _basic_fee(data, MP) == pytest.approx(
+        round(0.20 * monthrange(today.year, today.month)[1], 2)
+    )
 
 
 def test_cost_month_to_date_sums_total_fee():

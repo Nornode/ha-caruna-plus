@@ -64,6 +64,7 @@
       "energy_today": {"name": "Energy today"},
       "energy_yesterday": {"name": "Energy yesterday"},
       "energy_month_to_date": {"name": "Energy this month"},
+      "energy_month_to_date_previous_year": {"name": "Energy this month last year"},
       "last_reading_time": {"name": "Last reading time"},
       "main_fuse": {"name": "Main fuse"},
       "contract_type": {"name": "Contract type"},

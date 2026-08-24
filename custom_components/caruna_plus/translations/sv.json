@@ -63,6 +63,7 @@
       "energy_today": {"name": "Förbrukning idag"},
       "energy_yesterday": {"name": "Förbrukning igår"},
       "energy_month_to_date": {"name": "Förbrukning denna månad"},
+      "energy_month_to_date_previous_year": {"name": "Förbrukning denna månad förra året"},
       "last_reading_time": {"name": "Senaste avläsning"},
       "main_fuse": {"name": "Huvudsäkring"},
       "contract_type": {"name": "Avtalstyp"},
