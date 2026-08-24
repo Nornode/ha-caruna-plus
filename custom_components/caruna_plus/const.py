@@ -29,6 +29,12 @@ LTS_SOURCE = DOMAIN
 LTS_STATISTIC_ID_TEMPLATE = f"{DOMAIN}:{{mp}}_energy"
 LTS_BACKFILL_DAYS = 30
 
+# Diagnostic error categories recorded per coordinator slice (see coordinator.SliceError)
+ERROR_TYPE_AUTH = "auth_error"
+ERROR_TYPE_CONNECTION = "connection_error"
+ERROR_TYPE_RATE_LIMITED = "rate_limited"
+ERROR_TYPE_API = "api_error"
+
 # API endpoints — confirmed from probe (2026-08-18).
 # Energy: timespan=daily returns 24 hourly rows; timespan=hourly → 400.
 # Invoices: ?status=open|paid; returns compressedInvoices columnar format.
@@ -57,5 +63,3 @@ REQUEST_TIMEOUT_SECONDS = 30
 WICKET_USERNAME_FIELD = "ttqusername"
 WICKET_PASSWORD_FIELD = "userPassword"
 WICKET_LOGIN_BUTTON = "1"
-WICKET_COMPONENT_PATH = "0-userIDPanel-usernameLogin-loginWithUserID"
-WICKET_FOCUS_ELEMENT = "loginWithUserID5"

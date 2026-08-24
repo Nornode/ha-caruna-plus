@@ -21,7 +21,6 @@ from .const import (
     EP_ENERGY,
     EP_INVOICE,
     EP_INVOICES,
-    EP_PRICES,
     REQUEST_TIMEOUT_SECONDS,
 )
 from .models import (
@@ -224,6 +223,7 @@ class CarunaPlusClient:
                     raw=item,
                 )
             )
+        _LOGGER.debug("Parsed %d asset(s) for customer=%s", len(assets), customer)
         return assets
 
     async def async_get_energy(
@@ -269,6 +269,10 @@ class CarunaPlusClient:
                 vat=_to_float(entry.get("valueAddedTax")),
                 temperature=_to_float(entry.get("temperature")),
             ))
+        _LOGGER.debug(
+            "Parsed %d energy point(s) for mp=%s timespan=%s date=%s",
+            len(points), metering_point, timespan, target_date,
+        )
         return EnergySeries(metering_point_id=metering_point, timespan=timespan, points=points)
 
     async def async_get_invoices(self, customer: str) -> list[Invoice]:
@@ -289,6 +293,7 @@ class CarunaPlusClient:
             else:
                 batch = raw.get("invoices", [])
             items.extend(batch)
+        _LOGGER.debug("Parsed %d invoice(s) for customer=%s", len(items), customer)
         return [self._parse_invoice(item) for item in items]
 
     async def async_get_invoice(self, customer: str, invoice_id: str) -> InvoiceDetail | None:
@@ -318,20 +323,7 @@ class CarunaPlusClient:
         )
 
     async def async_get_prices(self, customer: str, metering_point: str) -> PricePlan:
-        # TODO(har): endpoint is placeholder; if it 404s, we fall back to
-        # deriving from the most recent invoice.
-        raw = await self._get_json(
-            EP_PRICES.format(customer=customer, mp=metering_point),
-            allow_missing=True,
-        )
-        if raw:
-            return PricePlan(
-                energy_price=_to_float(raw.get("energyPrice")),
-                transfer_fee=_to_float(raw.get("transferFee")),
-                electricity_tax=_to_float(raw.get("electricityTax")),
-                basic_fee_monthly=_to_float(raw.get("basicFee")),
-                vat_included=bool(raw.get("vatIncluded", True)),
-            )
+        # The prices endpoint is confirmed missing; derive prices from invoices.
         return await self._derive_price_from_invoices(customer)
 
     async def async_get_billing(self, customer: str) -> BillingSnapshot:
@@ -441,9 +433,12 @@ class CarunaPlusClient:
         token = await self._auth.async_ensure_token()
         headers = {"Authorization": f"Bearer {token}"}
         timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
+        _LOGGER.debug("GET %s params=%s", url, params)
         try:
             async with self._session.get(url, params=params, headers=headers, timeout=timeout) as resp:
+                _LOGGER.debug("GET %s -> %s", url, resp.status)
                 if resp.status in {401, 403} and _retry:
+                    _LOGGER.debug("Token rejected on %s; invalidating and retrying once", url)
                     await self._auth.async_invalidate_token()
                     return await self._get_json(url, params=params, allow_missing=allow_missing, _retry=False)
                 if resp.status in {401, 403}:
@@ -466,6 +461,7 @@ class CarunaPlusClient:
                 body = await resp.text()
                 if _is_login_page(body):
                     if _retry:
+                        _LOGGER.debug("Login page returned on %s; invalidating token and retrying once", url)
                         await self._auth.async_invalidate_token()
                         return await self._get_json(
                             url, params=params, allow_missing=allow_missing, _retry=False

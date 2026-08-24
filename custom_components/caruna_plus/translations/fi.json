@@ -63,6 +63,7 @@
       "energy_today": {"name": "Kulutus tänään"},
       "energy_yesterday": {"name": "Kulutus eilen"},
       "energy_month_to_date": {"name": "Kulutus tässä kuussa"},
+      "energy_month_to_date_previous_year": {"name": "Kulutus tässä kuussa viime vuonna"},
       "last_reading_time": {"name": "Viimeisin lukema"},
       "main_fuse": {"name": "Pääsulake"},
       "contract_type": {"name": "Sopimustyyppi"},
@@ -79,7 +80,10 @@
       "last_invoice_due_date": {"name": "Eräpäivä"},
       "last_invoice_status": {"name": "Laskun tila"},
       "next_invoice_estimate": {"name": "Seuraavan laskun arvio"},
-      "year_to_date_spend": {"name": "Vuoden kertymä"}
+      "year_to_date_spend": {"name": "Vuoden kertymä"},
+      "token_expires": {"name": "Tunnisteen vanheneminen"},
+      "last_successful_update": {"name": "Viimeisin onnistunut päivitys"},
+      "last_error": {"name": "Viimeisin virhe"}
     },
     "binary_sensor": {
       "invoice_overdue": {"name": "Lasku myöhässä"},

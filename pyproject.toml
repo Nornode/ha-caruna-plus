@@ -2,13 +2,13 @@
 name = "ha-caruna-plus-integration"
 version = "0.1.0"
 description = "Home Assistant custom integration for plus.caruna.fi"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 readme = "README.md"
 license = { text = "MIT" }
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "PL", "RUF"]
@@ -18,7 +18,7 @@ ignore = ["PLR0913", "PLR2004", "PLR0912", "PLR0915", "B905", "RUF003"]
 "tests/**" = ["PLR2004", "S101", "PLR0917", "PLC0415"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.13"
 strict = true
 warn_return_any = true
 disallow_untyped_defs = true

@@ -80,7 +80,10 @@
       "last_invoice_due_date": {"name": "Last invoice due date"},
       "last_invoice_status": {"name": "Last invoice status"},
       "next_invoice_estimate": {"name": "Next invoice estimate"},
-      "year_to_date_spend": {"name": "Year to date spend"}
+      "year_to_date_spend": {"name": "Year to date spend"},
+      "token_expires": {"name": "Token expires"},
+      "last_successful_update": {"name": "Last successful update"},
+      "last_error": {"name": "Last error"}
     },
     "binary_sensor": {
       "invoice_overdue": {"name": "Invoice overdue"},

@@ -18,14 +18,17 @@ MFA is detected by inspecting step 4's response for a challenge form.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 from datetime import UTC, datetime, timedelta
+from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup
+from yarl import URL
 
 from .const import (
     AUTH_BASE_URL,
@@ -41,15 +44,6 @@ from .const import (
 from .models import TokenStore
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _dump_debug(path: str, body: str) -> None:
-    """Write body to path for post-mortem inspection. Silent on errors."""
-    try:
-        import pathlib  # noqa: PLC0415
-        pathlib.Path(path).write_text(body, encoding="utf-8", errors="replace")
-    except OSError:
-        pass
 
 
 _META_REFRESH_RE = re.compile(
@@ -152,6 +146,9 @@ class CarunaAuthenticator:
                 raise CarunaConnectionError("Login timed out") from err
 
     async def _login_impl(self, *, mfa_code: str | None, mfa_state: dict[str, Any] | None) -> str:
+        self._clear_auth_cookies()
+        self._restore_mfa_trust_cookie()
+
         # Step 1: initiate login
         payload = {
             "redirectAfterLogin": f"{BASE_URL}/",
@@ -182,7 +179,8 @@ class CarunaAuthenticator:
         # Step 3: fetch IDP login form
         form_html = await self._get_text(idp_url)
         soup = await self._parse_html(form_html)
-        form = soup.find("form")
+        username_input = soup.find("input", {"name": WICKET_USERNAME_FIELD})
+        form = username_input.find_parent("form") if username_input else soup.find("form")
         if form is None:
             raise CarunaAPIError("IDP login form not found")
 
@@ -198,6 +196,8 @@ class CarunaAuthenticator:
         # Form action format:   ?{page}-{version}.-{formPath}       (no behavior index)
         # AJAX callback format: ?{page}-{version}.0-{formPath}-{button}  (index=0)
         # Insert the "0" before the "-" that follows the dot in the version segment.
+        # Some captures already include the "IBehaviorListener.N-" segment, in
+        # which case the regex is a no-op and the action is already AJAX-ready.
         ajax_base = re.sub(r"(\d+\.)(-)", r"\g<1>0\2", form_base_url)
         submit_input = form.find("input", {"type": "submit", "name": True})
         btn_component_id = submit_input.get("name") if submit_input else WICKET_LOGIN_BUTTON
@@ -206,7 +206,11 @@ class CarunaAuthenticator:
         # For the focused-element header, use the visual button's HTML id.
         login_btn = soup.find(id=re.compile(r"loginWithUserID\d*$"))
         btn_focused_id = login_btn.get("id") if login_btn else btn_component_id
-        _LOGGER.debug("Step 4 AJAX URL: %s (focused: %s)", submit_url, btn_focused_id)
+        _LOGGER.debug(
+            "Step 4 AJAX URL: %s (focused: %s)",
+            submit_url,
+            btn_focused_id,
+        )
 
         # Step 4: submit credentials via Wicket AJAX.
         # We POST to the form action + button component id (the AJAX callback URL).
@@ -275,9 +279,12 @@ class CarunaAuthenticator:
                         ajax_body = plain_body
                         # Re-check below with the new body
                     else:
-                        # Still on IDP — credentials rejected or another issue.
-                        raise CarunaAuthError(
-                            "Login rejected by plain form POST too — check credentials or account lock"
+                        # Still on IDP — classify explicit credential failures as
+                        # auth errors, and everything else as transient/protocol.
+                        if self._looks_like_invalid_credentials(plain_body):
+                            raise CarunaAuthError("Invalid credentials")
+                        raise CarunaConnectionError(
+                            "IDP stayed on login form after credential submit"
                         )
             except aiohttp.ClientError as err:
                 raise CarunaConnectionError(f"Plain POST network error: {err}") from err
@@ -295,20 +302,23 @@ class CarunaAuthenticator:
             # which contains an escaped meta-refresh; fall back to that path.
             fallback = self._extract_meta_refresh(ajax_body, base=submit_url)
             if not fallback:
-                _dump_debug("/tmp/caruna_step4_ajax_body.html", ajax_body)
-                _LOGGER.error(
-                    "Step 4 AJAX body contained no redirect URL (length=%d); "
-                    "dumped to /tmp/caruna_step4_ajax_body.html for inspection",
+                _LOGGER.debug(
+                    "Step 4 AJAX body contained no redirect URL (length=%d body=%.2000s)",
                     len(ajax_body),
+                    ajax_body,
                 )
-                raise CarunaAuthError("Login rejected — no post-credentials redirect")
+                if self._looks_like_invalid_credentials(ajax_body):
+                    raise CarunaAuthError("Invalid credentials")
+                raise CarunaConnectionError("Login protocol mismatch — no post-credentials redirect")
             next_url = fallback
         # Wicket sometimes returns relative redirect URLs — make them absolute.
         if next_url and not next_url.startswith("http"):
             next_url = urljoin(submit_url, next_url)
         # errorGenericPage is Wicket's "something went wrong" page, not a success path.
         if "errorGenericPage" in next_url:
-            raise CarunaAuthError("Wicket returned errorGenericPage — invalid credentials or session expired")
+            raise CarunaConnectionError(
+                "Wicket returned errorGenericPage — session mismatch or transient server issue"
+            )
 
         # Step 5–6: follow meta-refresh + final auto-submit form
         meta_html = await self._get_text(next_url)
@@ -336,7 +346,7 @@ class CarunaAuthenticator:
                 _LOGGER.debug("Step 6 POST status=%s location_present=%s", resp.status, bool(location))
                 if not location:
                     body = await resp.text()
-                    _dump_debug("/tmp/caruna_smoke_step6_body.html", body)
+                    _LOGGER.debug("Step 6 body without Location (length=%d body=%.2000s)", len(body), body)
                     location = self._extract_meta_refresh(body, base=final_action) or ""
         except aiohttp.ClientError as err:
             raise CarunaConnectionError(f"Final form submit network error: {err}") from err
@@ -367,7 +377,11 @@ class CarunaAuthenticator:
                     if resp.status not in (301, 302, 303, 307, 308):
                         # Unexpected non-redirect — dump and bail
                         body = await resp.text()
-                        _dump_debug("/tmp/caruna_smoke_step7_nonredirect.html", body)
+                        _LOGGER.debug(
+                            "Step 7 non-redirect body (length=%d body=%.2000s)",
+                            len(body),
+                            body,
+                        )
                         raise CarunaAPIError(
                             f"OAuth redirect chain: unexpected status {resp.status}"
                         )
@@ -406,7 +420,7 @@ class CarunaAuthenticator:
                     raise CarunaConnectionError(f"Token exchange failed: {resp.status}")
                 if resp.status >= 400:
                     body = await resp.text()
-                    _dump_debug("/tmp/caruna_smoke_step7_400.html", body)
+                    _LOGGER.debug("Step 7 token 4xx body (length=%d body=%.2000s)", len(body), body)
                     raise CarunaAPIError(f"Token exchange HTTP {resp.status}")
                 token_data = await resp.json(content_type=None)
         except aiohttp.ClientError as err:
@@ -414,7 +428,7 @@ class CarunaAuthenticator:
 
         access_token = token_data.get("token") or token_data.get("access_token")
         if not access_token:
-            raise CarunaAuthError("Token exchange returned no token")
+            raise CarunaAPIError("Token exchange returned no token")
 
         # Prefer server-provided expiry; fall back to 55 minutes.
         expires_in = token_data.get("expiresIn") or token_data.get("expires_in") or 3300
@@ -427,6 +441,7 @@ class CarunaAuthenticator:
         self._store.expires_at = expires_at
         if customers:
             self._store.customer_numbers = customers
+        self._capture_mfa_trust_cookie()
         self.user_info = user_info
 
         _LOGGER.debug("Caruna+ login OK; %d customer(s); token expires %s", len(customers), expires_at.isoformat())
@@ -481,3 +496,43 @@ class CarunaAuthenticator:
         lowered = body.lower()
         needles = ("mfa", "one-time", "verification code", "vahvistuskoodi", "sms")
         return any(needle in lowered for needle in needles)
+
+    def _looks_like_invalid_credentials(self, body: str) -> bool:
+        lowered = body.lower()
+        needles = (
+            "invalid credentials",
+            "incorrect password",
+            "wrong password",
+            "bad credentials",
+            "virheellinen",
+            "väärä salasana",
+        )
+        return any(needle in lowered for needle in needles)
+
+    def _clear_auth_cookies(self) -> None:
+        jar = self._session.cookie_jar
+        for base_url in (AUTH_BASE_URL, BASE_URL):
+            host = urlparse(base_url).hostname
+            if host:
+                with contextlib.suppress(Exception):
+                    jar.clear_domain(host)
+
+    def _restore_mfa_trust_cookie(self) -> None:
+        raw_cookie = self._store.mfa_trust_cookie
+        if not raw_cookie:
+            return
+        parsed = SimpleCookie()
+        with contextlib.suppress(Exception):
+            parsed.load(raw_cookie)
+        cookies = {key: morsel.value for key, morsel in parsed.items()}
+        if cookies:
+            self._session.cookie_jar.update_cookies(cookies, response_url=URL(AUTH_BASE_URL))
+
+    def _capture_mfa_trust_cookie(self) -> None:
+        cookies = self._session.cookie_jar.filter_cookies(URL(AUTH_BASE_URL))
+        trust_pairs = []
+        for key, morsel in cookies.items():
+            lowered = key.lower()
+            if "trust" in lowered or "remember" in lowered or "mfa" in lowered:
+                trust_pairs.append(f"{key}={morsel.value}")
+        self._store.mfa_trust_cookie = "; ".join(trust_pairs) if trust_pairs else None
