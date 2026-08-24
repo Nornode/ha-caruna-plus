@@ -497,6 +497,82 @@ class CarunaCustomerSensor(CoordinatorEntity[CarunaPlusCoordinator], SensorEntit
         return self.entity_description.value_fn(self.coordinator.data)
 
 
+class CarunaDiagnosticSensor(CoordinatorEntity[CarunaPlusCoordinator], SensorEntity):
+    """Base for diagnostics that must stay readable even when the coordinator's
+    own update cycle is failing — that's the whole point of these sensors."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: CarunaPlusCoordinator, key: str) -> None:
+        super().__init__(coordinator)
+        self._attr_translation_key = key
+        customer = coordinator.customer or "unknown"
+        self._attr_unique_id = f"{coordinator.entry.entry_id}_{customer}_{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"customer:{customer}")},
+            name=f"Caruna+ ({customer})",
+            manufacturer="Caruna",
+            model="Customer account",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://plus.caruna.fi",
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
+
+
+class CarunaTokenExpiresSensor(CarunaDiagnosticSensor):
+    """When the current OAuth2 token was last issued to expire."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: CarunaPlusCoordinator) -> None:
+        super().__init__(coordinator, "token_expires")
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.coordinator.client.token_store.expires_at
+
+
+class CarunaLastUpdateSensor(CarunaDiagnosticSensor):
+    """Timestamp of the most recent slice (contract/energy/billing) that succeeded."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: CarunaPlusCoordinator) -> None:
+        super().__init__(coordinator, "last_successful_update")
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.coordinator.data.last_successful_update()
+
+
+class CarunaLastErrorSensor(CarunaDiagnosticSensor):
+    """Category of the most recent slice failure, with a per-slice breakdown as attributes."""
+
+    _attr_icon = "mdi:alert-circle-outline"
+
+    def __init__(self, coordinator: CarunaPlusCoordinator) -> None:
+        super().__init__(coordinator, "last_error")
+
+    @property
+    def native_value(self) -> str:
+        last = self.coordinator.data.last_error()
+        return last.error_type if last else "none"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attrs: dict[str, Any] = {}
+        for slice_name, err in self.coordinator.data.last_errors.items():
+            attrs[f"{slice_name}_error_type"] = err.error_type
+            attrs[f"{slice_name}_error_message"] = err.message
+            attrs[f"{slice_name}_error_time"] = err.occurred_at.isoformat()
+        return attrs
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -510,5 +586,8 @@ async def async_setup_entry(
             entities.append(CarunaAssetSensor(coordinator, asset, desc))
     for desc in BILLING_DESCRIPTIONS:
         entities.append(CarunaCustomerSensor(coordinator, desc))
+    entities.append(CarunaTokenExpiresSensor(coordinator))
+    entities.append(CarunaLastUpdateSensor(coordinator))
+    entities.append(CarunaLastErrorSensor(coordinator))
 
     async_add_entities(entities)

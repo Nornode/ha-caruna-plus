@@ -13,6 +13,7 @@ from homeassistant.data_entry_flow import FlowError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import (
+    CarunaAPIError,
     CarunaAuthError,
     CarunaConnectionError,
     CarunaPlusClient,
@@ -140,14 +141,22 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         try:
             await self._client.async_login()
+            _LOGGER.debug("Login succeeded for %s", self._username)
             return await self._finish_login()
         except CarunaMFARequired as err:
+            _LOGGER.debug("Login requires MFA for %s", self._username)
             self._mfa_prompt = err.prompt
             return await self.async_step_mfa()
         except CarunaAuthError:
+            _LOGGER.debug("Login rejected (invalid credentials) for %s", self._username)
             self._last_error = "auth"
             return None
         except CarunaConnectionError:
+            _LOGGER.debug("Login failed: cannot connect")
+            self._last_error = "cannot_connect"
+            return None
+        except CarunaAPIError:
+            _LOGGER.debug("Login failed: API/protocol error")
             self._last_error = "cannot_connect"
             return None
         except FlowError:
@@ -161,6 +170,7 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._client is not None
         customers = await self._client.async_get_customers()
         self._customers = [c.number for c in customers]
+        _LOGGER.debug("Found %d customer(s): %s", len(self._customers), self._customers)
         if self._reauth_entry is not None:
             # Reauth path — caller handles updating the entry.
             return self.async_abort(reason="reauth_successful")
@@ -174,6 +184,7 @@ class CarunaPlusConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._client is not None and self._username is not None and self._password is not None
         await self.async_set_unique_id(customer)
         self._abort_if_unique_id_configured()
+        _LOGGER.debug("Creating config entry for customer=%s", customer)
         return self.async_create_entry(
             title=f"Caruna+ ({customer})",
             data={

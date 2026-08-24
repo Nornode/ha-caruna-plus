@@ -80,7 +80,10 @@
       "last_invoice_due_date": {"name": "Förfallodatum"},
       "last_invoice_status": {"name": "Fakturastatus"},
       "next_invoice_estimate": {"name": "Uppskattning nästa faktura"},
-      "year_to_date_spend": {"name": "Kostnad hittills i år"}
+      "year_to_date_spend": {"name": "Kostnad hittills i år"},
+      "token_expires": {"name": "Token upphör"},
+      "last_successful_update": {"name": "Senaste lyckade uppdatering"},
+      "last_error": {"name": "Senaste fel"}
     },
     "binary_sensor": {
       "invoice_overdue": {"name": "Faktura förfallen"},

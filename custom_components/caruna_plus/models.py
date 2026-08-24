@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 
@@ -19,7 +19,7 @@ class TokenStore:
     def is_expired(self, margin_seconds: int = 0) -> bool:
         if not self.access_token or not self.expires_at:
             return True
-        return (self.expires_at.timestamp() - margin_seconds) <= datetime.now().timestamp()
+        return (self.expires_at.timestamp() - margin_seconds) <= datetime.now(UTC).timestamp()
 
     def to_dict(self) -> dict[str, Any]:
         return {

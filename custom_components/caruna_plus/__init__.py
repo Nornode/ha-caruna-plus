@@ -26,7 +26,7 @@ else:
     from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
     from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-    from .api import CarunaAuthError, CarunaConnectionError, CarunaPlusClient
+    from .api import CarunaAPIError, CarunaAuthError, CarunaConnectionError, CarunaPlusClient
     from .const import CONF_CUSTOMER, DATA_TOKEN, DOMAIN
     from .coordinator import CarunaPlusCoordinator
     from .models import TokenStore
@@ -49,12 +49,15 @@ else:
         customer = entry.data.get(CONF_CUSTOMER)
         coordinator = CarunaPlusCoordinator(hass, entry, client, customer=customer)
 
+        _LOGGER.debug("Setting up Caruna+ entry %s (customer=%s)", entry.entry_id, customer)
         try:
             await coordinator.async_config_entry_first_refresh()
         except CarunaAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except CarunaConnectionError as err:
             raise ConfigEntryNotReady(str(err)) from err
+        except CarunaAPIError as err:
+            raise ConfigEntryNotReady(f"Protocol error during setup: {err}") from err
 
         _persist_token(hass, entry, client.token_store.to_dict())
 
@@ -64,6 +67,7 @@ else:
 
         entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
+        _LOGGER.debug("Caruna+ entry %s set up (customer=%s)", entry.entry_id, coordinator.customer)
         return True
 
     async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -75,10 +79,12 @@ else:
             )
             if coordinator is not None:
                 _persist_token(hass, entry, coordinator.client.token_store.to_dict())
+        _LOGGER.debug("Caruna+ entry %s unloaded: %s", entry.entry_id, unload_ok)
         return unload_ok
 
     async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Reload when options change (interval, hourly toggle, etc.)."""
+        _LOGGER.debug("Options changed for entry %s; reloading", entry.entry_id)
         await hass.config_entries.async_reload(entry.entry_id)
 
     def _persist_token(
@@ -87,6 +93,7 @@ else:
         """Save the current token store into entry.data without triggering a reload."""
         if entry.data.get(DATA_TOKEN) == token_dict:
             return
+        _LOGGER.debug("Persisting refreshed token for entry %s", entry.entry_id)
         hass.config_entries.async_update_entry(
             entry,
             data={**entry.data, DATA_TOKEN: token_dict},

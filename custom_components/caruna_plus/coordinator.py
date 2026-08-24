@@ -34,6 +34,10 @@ from .const import (
     CONTRACT_FETCH_INTERVAL,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
+    ERROR_TYPE_API,
+    ERROR_TYPE_AUTH,
+    ERROR_TYPE_CONNECTION,
+    ERROR_TYPE_RATE_LIMITED,
     LTS_BACKFILL_DAYS,
     LTS_SOURCE,
     LTS_STATISTIC_ID_TEMPLATE,
@@ -41,6 +45,15 @@ from .const import (
 from .models import Asset, BillingSnapshot, EnergySeries, PricePlan
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(slots=True)
+class SliceError:
+    """A single failure recorded against one coordinator slice."""
+
+    error_type: str
+    message: str
+    occurred_at: datetime
 
 
 @dataclass
@@ -54,12 +67,19 @@ class CarunaPlusData:
     prices: dict[str, PricePlan] = field(default_factory=dict)
     billing: BillingSnapshot | None = None
     last_success: dict[str, datetime] = field(default_factory=dict)
+    last_errors: dict[str, SliceError] = field(default_factory=dict)
 
     def slice_is_stale(self, key: str, max_age: timedelta) -> bool:
         ts = self.last_success.get(key)
         if ts is None:
             return True
         return (datetime.now(UTC) - ts) > max_age
+
+    def last_successful_update(self) -> datetime | None:
+        return max(self.last_success.values(), default=None)
+
+    def last_error(self) -> SliceError | None:
+        return max(self.last_errors.values(), key=lambda e: e.occurred_at, default=None)
 
 
 class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
@@ -100,6 +120,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
 
         now = datetime.now(UTC)
         errors: list[str] = []
+        _LOGGER.debug("Update cycle starting for customer=%s", self.customer)
 
         # --- contract slice (daily) ---
         if now >= self._contract_next_fetch or not self._data.assets:
@@ -108,29 +129,39 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 self._data.assets = assets
                 self._data.last_success["contract"] = now
                 self._contract_next_fetch = now + CONTRACT_FETCH_INTERVAL
+                _LOGGER.debug("Contract slice OK: %d asset(s)", len(assets))
                 # Prices change on the same cadence as contracts.
                 try:
                     await self._fetch_prices()
                     self._data.last_success["prices"] = now
                 except (CarunaConnectionError, CarunaAPIError) as price_err:
+                    self._record_error("prices", price_err)
                     _LOGGER.debug("Price fetch failed (non-fatal): %s", price_err)
             except CarunaAuthError as err:
+                self._record_error("contract", err)
                 raise ConfigEntryAuthFailed(str(err)) from err
             except (CarunaConnectionError, CarunaAPIError) as err:
+                self._record_error("contract", err)
                 errors.append(f"contract: {err}")
                 _LOGGER.warning("Contract fetch failed: %s", err)
+        else:
+            _LOGGER.debug("Contract slice skipped (next fetch at %s)", self._contract_next_fetch)
 
         # --- energy slice (every cycle) ---
         try:
             await self._fetch_energy()
             self._data.last_success["energy"] = now
+            _LOGGER.debug("Energy slice OK for %d asset(s)", len(self._data.assets))
         except CarunaRateLimitError as err:
             wait = err.retry_after or 60
+            self._record_error("energy", err, message=f"rate-limited (retry after {wait}s)")
             _LOGGER.warning("Rate limited on energy; backing off %ss", wait)
             errors.append(f"energy: rate-limited (retry after {wait}s)")
         except CarunaAuthError as err:
+            self._record_error("energy", err)
             raise ConfigEntryAuthFailed(str(err)) from err
         except (CarunaConnectionError, CarunaAPIError) as err:
+            self._record_error("energy", err)
             errors.append(f"energy: {err}")
             _LOGGER.warning("Energy fetch failed: %s", err)
 
@@ -140,11 +171,16 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 self._data.billing = await self.client.async_get_billing(self.customer)
                 self._data.last_success["billing"] = now
                 self._billing_next_fetch = now + BILLING_FETCH_INTERVAL
+                _LOGGER.debug("Billing slice OK")
             except CarunaAuthError as err:
+                self._record_error("billing", err)
                 raise ConfigEntryAuthFailed(str(err)) from err
             except (CarunaConnectionError, CarunaAPIError) as err:
+                self._record_error("billing", err)
                 errors.append(f"billing: {err}")
                 _LOGGER.warning("Billing fetch failed: %s", err)
+        else:
+            _LOGGER.debug("Billing slice skipped (next fetch at %s)", self._billing_next_fetch)
 
         # LTS backfill / append — non-fatal
         try:
@@ -156,15 +192,32 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
         # failed and we have no cached data at all — energy being unavailable
         # is not a hard failure, the contract sensors can still populate.
         if errors and not self._data.assets:
+            _LOGGER.debug("Update cycle failing: %s", "; ".join(errors))
             raise UpdateFailed("; ".join(errors))
+        _LOGGER.debug("Update cycle complete; errors=%d", len(errors))
         return self._data
+
+    def _record_error(self, slice_name: str, err: Exception, *, message: str | None = None) -> None:
+        if isinstance(err, CarunaAuthError):
+            error_type = ERROR_TYPE_AUTH
+        elif isinstance(err, CarunaRateLimitError):
+            error_type = ERROR_TYPE_RATE_LIMITED
+        elif isinstance(err, CarunaConnectionError):
+            error_type = ERROR_TYPE_CONNECTION
+        else:
+            error_type = ERROR_TYPE_API
+        self._data.last_errors[slice_name] = SliceError(
+            error_type=error_type,
+            message=message or str(err),
+            occurred_at=datetime.now(UTC),
+        )
 
     async def _safe_call(self, coro_factory: Any) -> Any:
         try:
             return await coro_factory()
         except CarunaAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
-        except CarunaConnectionError as err:
+        except (CarunaConnectionError, CarunaAPIError) as err:
             raise UpdateFailed(str(err)) from err
 
     async def _fetch_energy(self) -> None:
@@ -175,6 +228,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
             # Fetch today so the energy_today sensor shows current-day usage.
             hourly = await self.client.async_get_energy(self.customer, mp, today, "daily")
             self._data.energy_hourly[mp] = hourly
+            _LOGGER.debug("Fetched %d hourly point(s) for %s", len(hourly.points), mp)
             # API "monthly" timespan returns one daily-aggregate point per day in the month.
             # Used for energy_yesterday and energy_month_to_date sensors.
             monthly = await self.client.async_get_energy(self.customer, mp, today, "monthly")
@@ -197,6 +251,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 _LOGGER.debug("Price for %s failed: %s", asset.metering_point_id, err)
                 continue
             self._data.prices[asset.metering_point_id] = plan
+
 
     async def _sync_long_term_statistics(self) -> None:
         """Backfill on first run, append on subsequent runs."""
@@ -243,6 +298,7 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 )
             if stats:
                 async_add_external_statistics(self.hass, metadata, stats)
+                _LOGGER.debug("LTS append: %s +%d point(s), running sum=%.3f", statistic_id, len(stats), running)
 
     async def _backfill_statistics(
         self, mp_id: str, statistic_id: str, metadata: StatisticMetaData
@@ -265,3 +321,4 @@ class CarunaPlusCoordinator(DataUpdateCoordinator[CarunaPlusData]):
                 )
         if stats:
             async_add_external_statistics(self.hass, metadata, stats)
+            _LOGGER.debug("LTS backfill: %s %d point(s) over %d day(s)", statistic_id, len(stats), LTS_BACKFILL_DAYS)

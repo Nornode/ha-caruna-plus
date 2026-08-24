@@ -80,7 +80,10 @@
       "last_invoice_due_date": {"name": "Eräpäivä"},
       "last_invoice_status": {"name": "Laskun tila"},
       "next_invoice_estimate": {"name": "Seuraavan laskun arvio"},
-      "year_to_date_spend": {"name": "Vuoden kertymä"}
+      "year_to_date_spend": {"name": "Vuoden kertymä"},
+      "token_expires": {"name": "Tunnisteen vanheneminen"},
+      "last_successful_update": {"name": "Viimeisin onnistunut päivitys"},
+      "last_error": {"name": "Viimeisin virhe"}
     },
     "binary_sensor": {
       "invoice_overdue": {"name": "Lasku myöhässä"},
