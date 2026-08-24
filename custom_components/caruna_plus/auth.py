@@ -196,8 +196,9 @@ class CarunaAuthenticator:
         # Form action format:   ?{page}-{version}.-{formPath}       (no behavior index)
         # AJAX callback format: ?{page}-{version}.0-{formPath}-{button}  (index=0)
         # Insert the "0" before the "-" that follows the dot in the version segment.
+        # Some captures already include the "IBehaviorListener.N-" segment, in
+        # which case the regex is a no-op and the action is already AJAX-ready.
         ajax_base = re.sub(r"(\d+\.)(-)", r"\g<1>0\2", form_base_url)
-        ajax_url_valid = ajax_base != form_base_url
         submit_input = form.find("input", {"type": "submit", "name": True})
         btn_component_id = submit_input.get("name") if submit_input else WICKET_LOGIN_BUTTON
         submit_url = f"{ajax_base}-{btn_component_id}"
@@ -206,10 +207,9 @@ class CarunaAuthenticator:
         login_btn = soup.find(id=re.compile(r"loginWithUserID\d*$"))
         btn_focused_id = login_btn.get("id") if login_btn else btn_component_id
         _LOGGER.debug(
-            "Step 4 AJAX URL: %s (focused: %s valid=%s)",
+            "Step 4 AJAX URL: %s (focused: %s)",
             submit_url,
             btn_focused_id,
-            ajax_url_valid,
         )
 
         # Step 4: submit credentials via Wicket AJAX.
@@ -227,27 +227,22 @@ class CarunaAuthenticator:
             "Origin": AUTH_BASE_URL,
             "Referer": idp_url,
         }
-        ajax_body = ""
-        if ajax_url_valid:
-            try:
-                async with self._session.post(submit_url, data=form_data, headers=ajax_headers) as resp:
-                    _LOGGER.debug(
-                        "Step 4 AJAX response: status=%s final_url=%s",
-                        resp.status,
-                        resp.url,
-                    )
-                    if resp.status in {401, 403}:
-                        raise CarunaAuthError("Invalid credentials")
-                    if resp.status >= 500:
-                        raise CarunaConnectionError(f"Credential submit failed: {resp.status}")
-                    if resp.status >= 400:
-                        raise CarunaAPIError(f"Credential submit HTTP {resp.status}")
-                    ajax_body = await resp.text()
-            except aiohttp.ClientError as err:
-                raise CarunaConnectionError(f"Credential submit network error: {err}") from err
-        else:
-            _LOGGER.debug("Step 4 AJAX URL construction failed; retrying with plain form POST")
-            ajax_body = "errorGenericPage"
+        try:
+            async with self._session.post(submit_url, data=form_data, headers=ajax_headers) as resp:
+                _LOGGER.debug(
+                    "Step 4 AJAX response: status=%s final_url=%s",
+                    resp.status,
+                    resp.url,
+                )
+                if resp.status in {401, 403}:
+                    raise CarunaAuthError("Invalid credentials")
+                if resp.status >= 500:
+                    raise CarunaConnectionError(f"Credential submit failed: {resp.status}")
+                if resp.status >= 400:
+                    raise CarunaAPIError(f"Credential submit HTTP {resp.status}")
+                ajax_body = await resp.text()
+        except aiohttp.ClientError as err:
+            raise CarunaConnectionError(f"Credential submit network error: {err}") from err
 
         # If Wicket returned errorGenericPage via AJAX, fall back to a plain form
         # POST.  This happens when the session state doesn't survive to the AJAX
