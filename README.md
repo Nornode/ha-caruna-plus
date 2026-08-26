@@ -37,7 +37,7 @@ If your password changes or the token can no longer be refreshed, Home Assistant
 ### Options (Configure → Options)
 
 | Option | Default | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Update interval | 60 min | Minimum 15 min, maximum 24 h. Anything shorter than 15 min is wasted; Caruna's data is batch-published. |
 | Fetch hourly consumption | on | Needed for the Energy dashboard. Turn off only if you don't care about hourly granularity. |
 
